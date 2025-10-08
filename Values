@@ -1,0 +1,81 @@
+import streamlit as st
+rec = {
+"timestamp": datetime.utcnow().isoformat(),
+"which": which, # 'today' or '2075'
+"Security": sec,
+"Solidarity": sol,
+"Survival": surv,
+}
+st.session_state.responses.append(rec)
+return True
+
+
+# --- Form component (reusable)
+
+
+def ternary_form(title, which_key, lock_flag_key):
+st.markdown(f"### {title}")
+if st.session_state.get(lock_flag_key, False):
+st.success("Thanks — you've already submitted this section.")
+return
+
+
+col1, col2, col3 = st.columns(3)
+with col1:
+sec = st.number_input("Security", 0, 100, value=34, step=1, key=f"sec_{which_key}")
+with col2:
+sol = st.number_input("Solidarity", 0, 100, value=33, step=1, key=f"sol_{which_key}")
+with col3:
+surv = st.number_input("Survival", 0, 100, value=33, step=1, key=f"surv_{which_key}")
+
+
+total = sec + sol + surv
+st.write(f"**Total:** {total}")
+
+
+normalize = st.button("Auto‑balance to 100", key=f"norm_{which_key}")
+if normalize:
+# Simple normalize: scale proportionally; if all zeros, split equally
+if total == 0:
+sec_, sol_, surv_ = 34, 33, 33
+else:
+sec_ = round(sec * 100 / total)
+sol_ = round(sol * 100 / total)
+surv_ = 100 - sec_ - sol_
+st.session_state[f"sec_{which_key}"] = sec_
+st.session_state[f"sol_{which_key}"] = sol_
+st.session_state[f"surv_{which_key}"] = surv_
+st.rerun()
+
+
+submitted = st.button("Submit", key=f"submit_{which_key}")
+if submitted:
+ok = submit_record(which_key, int(st.session_state[f"sec_{which_key}"]),
+int(st.session_state[f"sol_{which_key}"]),
+int(st.session_state[f"surv_{which_key}"]))
+if ok:
+st.session_state[lock_flag_key] = True
+st.success("Submitted! Thank you.")
+
+
+# Render the two sections
+ternary_form("Today", "today", "submitted_today")
+st.divider()
+ternary_form("Year 2075", "2075", "submitted_2075")
+
+
+# --- Download data (CSV)
+if st.session_state.responses:
+df = pd.DataFrame(st.session_state.responses)
+st.markdown("### Download your dataset")
+csv = df.to_csv(index=False).encode("utf-8")
+st.download_button("Download CSV", data=csv, file_name="values_responses.csv", mime="text/csv")
+
+
+with st.expander("Preview data"):
+st.dataframe(df, use_container_width=True)
+
+
+st.info("Tip: Share this app link so each respondent submits once per section. The CSV you download is what you'll use for aggregation.")
+else:
+st.caption("No responses yet — submit above to enable CSV download.")
